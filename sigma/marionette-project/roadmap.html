@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marionette 项目学习路线图</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            text-align: center;
+            color: rgba(255,255,255,0.9);
+            margin-bottom: 40px;
+            font-size: 1.1em;
+        }
+
+        .progress-bar {
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            height: 30px;
+            margin-bottom: 40px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            background: linear-gradient(90deg, #00f260 0%, #0575e6 100%);
+            height: 100%;
+            width: 0%;
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+
+        .concepts {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .concept-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .concept-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+
+        .concept-card.current {
+            border: 3px solid #ffd700;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.7); }
+            50% { box-shadow: 0 0 0 10px rgba(255, 215, 0, 0); }
+        }
+
+        .concept-number {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .status-not-started {
+            background: #e0e0e0;
+            color: #666;
+        }
+
+        .status-in-progress {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+
+        .status-mastered {
+            background: linear-gradient(135deg, #00f260 0%, #0575e6 100%);
+            color: white;
+        }
+
+        .concept-title {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .concept-meta {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 15px;
+        }
+
+        .score {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 5px 10px;
+            background: #f0f0f0;
+            border-radius: 5px;
+            font-weight: 600;
+        }
+
+        .phase-divider {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 20px;
+            color: white;
+            font-size: 1.3em;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        footer {
+            text-align: center;
+            color: rgba(255,255,255,0.8);
+            margin-top: 40px;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎓 Marionette 项目学习路线图</h1>
+        <p class="subtitle">加速模式 | 预计 6-8 周完成</p>
+
+        <div class="progress-bar">
+            <div class="progress-fill" style="width: 100%">100%</div>
+        </div>
+
+        <div class="concepts">
+            <div class="phase-divider">📚 阶段一：Python 进阶</div>
+
+            <div class="concept-card">
+                <div class="concept-number">1</div>
+                <span class="status-badge status-mastered">已掌握</span>
+                <div class="concept-title">🎯 装饰器原理</div>
+                <div class="concept-meta">
+                    理解 @ 符号背后的机制<br>
+                    学会编写自定义装饰器
+                </div>
+                <div class="score">100%</div>
+            </div>
+
+            <div class="concept-card">
+                <div class="concept-number">2</div>
+                <span class="status-badge status-mastered">已掌握</span>
+                <div class="concept-title">📝 高级类型注解</div>
+                <div class="concept-meta">
+                    泛型、Union、Optional<br>
+                    torchtyping 的使用
+                </div>
+                <div class="score">100%</div>
+            </div>
+
+            <div class="concept-card">
+                <div class="concept-number">3</div>
+                <span class="status-badge status-mastered">已掌握</span>
+                <div class="concept-title">🔮 魔术方法</div>
+                <div class="concept-meta">
+                    __getattr__, __iter__<br>
+                    自定义类行为
+                </div>
+                <div class="score">100%</div>
+            </div>
+
+            <div class="phase-divider">🔥 阶段二：PyTorch 基础</div>
+
+            <div class="concept-card">
+                <div class="concept-number">4</div>
+                <span class="status-badge status-mastered">已掌握</span>
+                <div class="concept-title">📊 Tensor 基础</div>
+                <div class="concept-meta">
+                    Tensor 创建与运算<br>
+                    自动求导机制
+                </div>
+                <div class="score">100%</div>
+            </div>
+
+            <div class="concept-card">
+                <div class="concept-number">5</div>
+                <span class="status-badge status-mastered">已掌握</span>
+                <div class="concept-title">🧠 nn.Module 架构</div>
+                <div class="concept-meta">
+                    构建神经网络<br>
+                    PointClassifier 分析
+                </div>
+                <div class="score">85%</div>
+            </div>
+
+            <div class="concept-card">
+                <div class="concept-number">6</div>
+                <span class="status-badge status-mastered">已掌握</span>
+                <div class="concept-title">💾 数据加载流程</div>
+                <div class="concept-meta">
+                    Sequence → Batch<br>
+                    datamodule.py 深度解析
+                </div>
+                <div class="score">95%</div>
+            </div>
+
+            <div class="phase-divider">🏗️ 阶段三：项目架构</div>
+
+            <div class="concept-card">
+                <div class="concept-number">7</div>
+                <span class="status-badge status-mastered">已掌握</span>
+                <div class="concept-title">⚙️ 配置系统</div>
+                <div class="concept-meta">
+                    Hydra + YAML<br>
+                    工厂模式应用
+                </div>
+                <div class="score">95%</div>
+            </div>
+
+            <div class="concept-card">
+                <div class="concept-number">8</div>
+                <span class="status-badge status-mastered">已掌握</span>
+                <div class="concept-title">🌊 扩散模型基础</div>
+                <div class="concept-meta">
+                    前向/反向过程<br>
+                    DDPM 原理
+                </div>
+                <div class="score">90%</div>
+            </div>
+
+            <div class="concept-card">
+                <div class="concept-number">9</div>
+                <span class="status-badge status-mastered">已掌握</span>
+                <div class="concept-title">🤖 Transformer 架构</div>
+                <div class="concept-meta">
+                    自注意力机制<br>
+                    Multi-Head, Positional Encoding
+                </div>
+                <div class="score">85%</div>
+            </div>
+
+            <div class="concept-card">
+                <div class="concept-number">10</div>
+                <span class="status-badge status-mastered">已掌握</span>
+                <div class="concept-title">🎭 Marionette 整体架构</div>
+                <div class="concept-meta">
+                    时空分离架构<br>
+                    完整数据流
+                </div>
+                <div class="score">90%</div>
+            </div>
+        </div>
+
+        <footer>
+            <p>🎉 恭喜完成！全部 10 个概念已掌握 | 100% 完成 | 学习之旅圆满结束！</p>
+        </footer>
+    </div>
+</body>
+</html>

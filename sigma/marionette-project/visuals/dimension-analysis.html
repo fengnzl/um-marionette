@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>维度计算分析</title>
+    <style>
+        body {
+            font-family: 'Monaco', 'Menlo', monospace;
+            background: #1a1a2e;
+            color: #eee;
+            padding: 40px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #4e9af1;
+            border-bottom: 2px solid #4e9af1;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #00ff9d;
+            margin-top: 40px;
+        }
+        .code-section {
+            background: #16213e;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid #4e9af1;
+        }
+        pre {
+            background: #0f3460;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        code {
+            color: #00ff9d;
+        }
+        .highlight {
+            background: #e94560;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        .dimension-box {
+            background: #0f3460;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border-left: 4px solid #00ff9d;
+        }
+        .flow-diagram {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        .flow-item {
+            background: #4e9af1;
+            color: #1a1a2e;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .arrow {
+            font-size: 1.5em;
+            color: #4e9af1;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #4e9af1;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background: #4e9af1;
+            color: #1a1a2e;
+        }
+        .comment {
+            color: #888;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 PointClassifier 维度计算分析</h1>
+
+        <div class="code-section">
+            <h2>📋 关键配置信息</h2>
+            <pre><code># 从 configs.py 和 model.py 中：
+emb_dim = temporal_hidden_dims  # 假设是 32
+hidden_dims = temporal_hidden_dims  # 也是 32
+emb_dim == hidden_dims  # 它们相等！</code></pre>
+        </div>
+
+        <div class="code-section">
+            <h2>🔧 各个 Embedding 的生成过程</h2>
+
+            <h3>1️⃣ dif_time_emb (扩散时间嵌入)</h3>
+            <div class="dimension-box">
+                <pre><code># model.py 第 204-210 行
+position_emb = NyquistFrequencyEmbedding(dim=<span class="highlight">emb_dim</span>, timesteps=steps)
+self.diffusion_time_encoder = nn.Sequential(
+    position_emb,              # 输出: [batch, emb_dim]
+    nn.Linear(emb_dim, emb_dim),   # 还是 [batch, emb_dim]
+    nn.GELU(),
+    nn.Linear(emb_dim, emb_dim),   # 还是 [batch, emb_dim]
+)
+
+# 所以 dif_time_emb 的维度是: <span class="highlight">[batch, emb_dim]</span>
+# 也就是: [batch, hidden_dims]</code></pre>
+            </div>
+
+            <h3>2️⃣ time_emb (事件间时间嵌入)</h3>
+            <div class="dimension-box">
+                <pre><code># model.py 第 199-202 行
+position_emb = NyquistFrequencyEmbedting(
+    dim=<span class="highlight">emb_dim // 2</span>,  # 注意这里是 emb_dim 的一半！
+    timesteps=max_time
+)
+self.time_encoder = nn.Sequential(position_emb)
+
+# 使用时 (model.py 第 255-257 行):
+time_emb = self.time_encoder(
+    torch.cat([x_n.time, x_n.tau], dim=-1)  # 拼接了两个时间特征
+).reshape(B, L, -1)
+
+# 所以 time_emb 的维度是: <span class="highlight">[batch, sequence, emb_dim]</span>
+# 也就是: [batch, sequence, hidden_dims]</code></pre>
+            </div>
+
+            <h3>3️⃣ event_emb (事件序列嵌入)</h3>
+            <div class="dimension-box">
+                <pre><code># model.py 第 260 行
+event_emb = self.sequence_encoder(time_emb)  # sequence_encoder 输出 emb_dims
+
+# 所以 event_emb 的维度是: <span class="highlight">[batch, sequence, emb_dims]</span>
+# 也就是: [batch, sequence, hidden_dims]</code></pre>
+            </div>
+
+            <h3>4️⃣ cond_emb (条件嵌入)</h3>
+            <div class="dimension-box">
+                <pre><code># model.py 第 158 行
+self.event_condition_encoder = nn.Embedding(200, <span class="highlight">self.cond_emb_size</span>)
+# 其中 cond_emb_size = hidden_dims (第 156 行)
+
+# model.py 第 271 行
+event_level_cond_emb = torch.cat([
+    condition1_cond_emb,  # 每个: [batch, sequence, hidden_dims]
+    condition2_cond_emb,
+    condition3_cond_emb,
+    condition4_cond_emb,
+    condition5_cond_emb,
+    condition6_cond_emb,
+], dim=-1)
+
+# 所以 cond_emb 的维度是: <span class="highlight">[batch, sequence, 6 * hidden_dims]</span></code></pre>
+            </div>
+        </div>
+
+        <div class="code-section">
+            <h2>🎯 在 PointClassifier.forward 中的拼接</h2>
+            <pre><code># classifier.py 第 58 行的 unsqueeze 和 repeat
+x = torch.cat([
+    time_emb,                              # [batch, seq, hidden_dims]
+    event_emb,                             # [batch, seq, hidden_dims]
+    dif_time_emb.unsqueeze(1).repeat(1, L, 1),  # [batch, 1, hidden_dims] → [batch, seq, hidden_dims]
+    cond_emb,                              # [batch, seq, 6*hidden_dims]
+], dim=-1)
+
+# 总维度 = hidden_dims + hidden_dims + hidden_dims + 6*hidden_dims
+#         = 9 * hidden_dims ✅</code></pre>
+        </div>
+
+        <div class="code-section">
+            <h2>✅ 总结：为什么是 9 * hidden_dims？</h2>
+            <table>
+                <tr>
+                    <th>Embedding</th>
+                    <th>维度</th>
+                    <th>倍数</th>
+                </tr>
+                <tr>
+                    <td>time_emb</td>
+                    <td>[batch, seq, hidden_dims]</td>
+                    <td>1×</td>
+                </tr>
+                <tr>
+                    <td>event_emb</td>
+                    <td>[batch, seq, hidden_dims]</td>
+                    <td>1×</td>
+                </tr>
+                <tr>
+                    <td>dif_time_emb (广播后)</td>
+                    <td>[batch, seq, hidden_dims]</td>
+                    <td>1×</td>
+                </tr>
+                <tr>
+                    <td>cond_emb (6个条件)</td>
+                    <td>[batch, seq, 6*hidden_dims]</td>
+                    <td>6×</td>
+                </tr>
+                <tr>
+                    <td><strong>总计</strong></td>
+                    <td><strong>[batch, seq, 9*hidden_dims]</strong></td>
+                    <td><strong>9×</strong></td>
+                </tr>
+            </table>
+
+            <div class="dimension-box" style="margin-top: 20px;">
+                <p><strong>关键发现：</strong>注释 "# 3 * hidden_dims" 实际上是不准确的！真正的计算是 <span class="highlight">1 + 1 + 1 + 6 = 9</span>，而不是 3。</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

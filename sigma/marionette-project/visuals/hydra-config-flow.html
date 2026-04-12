@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>Hydra 配置流程真相</title>
+    <style>
+        body {
+            font-family: 'Monaco', 'Menlo', monospace;
+            background: #1a1a2e;
+            color: #eee;
+            padding: 40px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #4e9af1;
+            border-bottom: 2px solid #4e9af1;
+            padding-bottom: 10px;
+        }
+        .success-box {
+            background: #16213e;
+            padding: 25px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #00ff9d;
+        }
+        .code-section {
+            background: #0f3460;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        pre {
+            background: #0f3460;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        code {
+            color: #00ff9d;
+        }
+        .highlight {
+            background: #e94560;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        .arrow {
+            text-align: center;
+            font-size: 2em;
+            color: #4e9af1;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 真相大白！配置参数传递机制</h1>
+
+        <div class="success-box">
+            <h2>🔍 train.py 中的调用（第 108、114、116 行）</h2>
+            <pre><code># 第 108 行
+datamodule = instantiate_datamodule(<span class="highlight">config.data</span>)
+
+# 第 114 行
+tpp_model, discrete_diffusion = instantiate_model(<span class="highlight">config.model</span>, datamodule)
+
+# 第 116 行
+task = instantiate_task(<span class="highlight">config.task</span>, ...)</code></pre>
+
+            <p><strong>关键发现</strong>：传入的是 <code>config.data</code>、<code>config.model</code>、<code>config.task</code>！</p>
+        </div>
+
+        <div class="code-section">
+            <h2>📋 configs.py 中的函数定义</h2>
+            <pre><code>def instantiate_datamodule(config: DictConfig):
+    return DataModule(
+        config.root,              # 实际是 config.data.root
+        config.name,              # 实际是 config.data.name
+        batch_size=config.batch_size,  # 实际是 config.data.batch_size
+    )</code></pre>
+
+            <p><strong>参数名称</strong>：虽然函数参数叫 <code>config</code>，但它实际上是 <code>config.data</code>！</p>
+        </div>
+
+        <div class="success-box">
+            <h2>🔄 完整的参数传递链</h2>
+
+            <h3>第 1 步：Hydra 构建配置</h3>
+            <pre><code>config (完整的配置对象)
+├── config.data              # data_set.yaml 的内容
+│   ├── root: "data/"
+│   ├── batch_size: 512
+│   └── name: "Istanbul"
+├── config.model             # Marionette.yaml 的内容
+│   ├── temporal_steps: 100
+│   └── ...
+└── config.task              # density.yaml 的内容
+    └── learning_rate1: 0.0001</code></pre>
+
+            <h3>第 2 步：train.py 调用函数</h3>
+            <pre><code># 传入 config.data（不是整个 config！）
+datamodule = instantiate_datamodule(config.data)</code></pre>
+
+            <h3>第 3 步：configs.py 接收参数</h3>
+            <pre><code>def instantiate_datamodule(config: DictConfig):
+    # 这里的 'config' 实际上是 'config.data'！
+    # 所以 config.root 实际上是 config.data.root
+    return DataModule(
+        config.root,              # ← 这是 config.data.root
+        config.name,              # ← 这是 config.data.name
+        batch_size=config.batch_size,  # ← 这是 config.data.batch_size
+    )</code></pre>
+
+            <h3>第 4 步：同样的模式用于其他函数</h3>
+            <pre><code># train.py 第 114 行
+instantiate_model(config.model, datamodule)
+
+# configs.py 第 18 行
+def instantiate_model(config: DictConfig, datamodule):
+    # 这里的 'config' 实际上是 'config.model'！
+    classifier = PointClassifier(
+        hidden_dims=config.temporal_hidden_dims,  # 实际是 config.model.temporal_hidden_dims
+        layer=config.temporal_classifier_layer,   # 实际是 config.model.temporal_classifier_layer
+    )</code></pre>
+        </div>
+
+        <div class="code-section">
+            <h2>💡 命名混淆的解释</h2>
+            <p>这里有一个<strong>命名混淆</strong>：</p>
+            <ul>
+                <li>在 <code>train.py</code> 中：<code>config</code> 是完整的配置对象</li>
+                <li>在 <code>configs.py</code> 中：<code>config</code> 只是配置的一部分（data、model 或 task）</li>
+            </ul>
+
+            <pre><code># train.py 中的 config 结构
+config (完整配置)
+├── config.data
+├── config.model
+└── config.task
+
+# 传入函数时：
+instantiate_datamodule(config.data)  # 只传 data 部分
+
+# 函数内部：
+def instantiate_datamodule(config: DictConfig):
+    # 这里的 config = config.data
+    # 不是完整的 config！</code></pre>
+        </div>
+
+        <div class="success-box">
+            <h2>✅ 所以你的问题的答案是</h2>
+
+            <p><strong>问题</strong>：为什么是 <code>config.batch_size</code> 而不是 <code>config.data.batch_size</code>？</p>
+
+            <p><strong>答案</strong>：因为传入函数的是 <code>config.data</code>，而函数参数名叫 <code>config</code>。所以：</p>
+
+            <pre><code># 在外部（train.py）
+config.data.batch_size  # 正确路径
+
+# 在函数内部（configs.py）
+config.batch_size        # 这里的 config = config.data</code></pre>
+
+            <p><strong>实际上</strong>：<code>config.batch_size</code> 访问的就是 <code>config.data.batch_size</code>，只是函数参数名称造成了混淆！</p>
+        </div>
+
+        <div class="code-section">
+            <h2>🎯 更清晰的命名方式</h2>
+            <p>如果用更清晰的命名，代码应该是：</p>
+
+            <pre><code># configs.py 应该这样写：
+def instantiate_datamodule(data_config: DictConfig):
+    return DataModule(
+        data_config.root,
+        data_config.name,
+        batch_size=data_config.batch_size,
+    )
+
+def instantiate_model(model_config: DictConfig, datamodule):
+    classifier = PointClassifier(
+        hidden_dims=model_config.temporal_hidden_dims,
+        layer=model_config.temporal_classifier_layer,
+    )</code></pre>
+
+            <p>这样就不会有混淆了！</p>
+        </div>
+
+        <div class="success-box">
+            <h2>🎉 总结</h2>
+
+            <p>你提出的问题揭示了一个重要的设计模式：</p>
+
+            <ol>
+                <li><strong>配置是分层级的</strong>：config.data、config.model、config.task</li>
+                <li><strong>函数接收的是部分配置</strong>：不是整个 config，而是其中的一个分支</li>
+                <li><strong>参数命名可能造成混淆</strong>：虽然参数名叫 config，但它实际上只是配置的一部分</li>
+            </ol>
+
+            <p>你的观察力很强！🎉</p>
+        </div>
+    </div>
+</body>
+</html>

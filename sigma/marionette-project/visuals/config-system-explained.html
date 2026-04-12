@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hydra 配置系统详解</title>
+    <style>
+        body {
+            font-family: 'Monaco', 'Menlo', monospace;
+            background: #1a1a2e;
+            color: #eee;
+            padding: 40px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #4e9af1;
+            border-bottom: 2px solid #4e9af1;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #00ff9d;
+            margin-top: 40px;
+        }
+        .concept-box {
+            background: #16213e;
+            padding: 25px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #4e9af1;
+        }
+        .file-tree {
+            background: #0f3460;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-family: monospace;
+        }
+        pre {
+            background: #0f3460;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        code {
+            color: #00ff9d;
+        }
+        .highlight {
+            background: #e94560;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        .flow-diagram {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+        .flow-item {
+            background: #4e9af1;
+            color: #1a1a2e;
+            padding: 15px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .arrow {
+            font-size: 2em;
+            color: #4e9af1;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #4e9af1;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background: #4e9af1;
+            color: #1a1a2e;
+        }
+        .example-section {
+            background: #0f3460;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚙️ Hydra 配置系统详解</h1>
+
+        <div class="concept-box">
+            <h2>什么是 Hydra？</h2>
+            <p><strong>Hydra</strong> 是一个优雅的 Python 配置管理框架，由 Facebook 开发。它让你能够：</p>
+            <ul>
+                <li>📁 通过 YAML 文件管理配置</li>
+                <li>🔧 组合多个配置文件（模块化）</li>
+                <li>🚀 命令行覆盖配置</li>
+                <li>🎯 自动类型转换和验证</li>
+                <li>📊 生成配置覆盖和日志</li>
+            </ul>
+        </div>
+
+        <h2>📂 Marionette 项目的配置结构</h2>
+
+        <div class="file-tree">
+            config/
+            ├── train.yaml          # 主配置文件
+            ├── data/
+            │   └── data_set.yaml   # 数据配置
+            ├── task/
+            │   └── density.yaml    # 任务配置
+            ├── model/
+            │   └── Marionette.yaml # 模型配置
+            └── hydra/
+                └── default.yaml    # Hydra 配置
+        </div>
+
+        <div class="example-section">
+            <h3>🔍 train.yaml（主配置文件）</h3>
+            <pre><code>defaults:
+  - data: data_set      # 引用 data/data_set.yaml
+  - task: density       # 引用 task/density.yaml
+  - hydra: default      # 引用 hydra/default.yaml
+  - _self_              # 当前文件的配置优先
+  - model: Marionette   # 引用 model/Marionette.yaml
+
+trainer:
+  _target_: pytorch_lightning.Trainer
+  accelerator: gpu
+  devices: [0]
+  max_epochs: 1000
+
+seed: 135398
+project: Marionette</code></pre>
+
+            <p><strong>关键点</strong>：<code>defaults</code> 列表定义了配置文件的<strong>组合顺序</strong>。</p>
+        </div>
+
+        <div class="example-section">
+            <h3>📊 data/data_set.yaml（数据配置）</h3>
+            <pre><code>root: data/
+batch_size: 512
+name: Istanbul</code></pre>
+        </div>
+
+        <div class="example-section">
+            <h3>🤖 model/Marionette.yaml（模型配置）</h3>
+            <pre><code>temporal_steps: 100
+spatial_steps: 200
+temporal_classifier_layer: 1
+temporal_encoder_layer: 3
+temporal_mix_components: 8
+temporal_hidden_dims: 32
+temporal_kernel_size: 5
+temporal_time_segments: 24
+spatial_hidden_dims: 256
+num_condition_types: 6</code></pre>
+        </div>
+
+        <h2>🔄 Hydra 的工作流程</h2>
+
+        <div class="flow-diagram">
+            <div class="flow-item">1. 读取 train.yaml</div>
+            <div class="arrow">→</div>
+            <div class="flow-item">2. 加载默认配置</div>
+            <div class="arrow">→</div>
+            <div class="flow-item">3. 合并配置</div>
+            <div class="arrow">→</div>
+            <div class="flow-item">4. 命令行覆盖</div>
+            <div class="arrow">→</div>
+            <div class="flow-item">5. 生成最终配置</div>
+        </div>
+
+        <h2>💻 代码中的使用</h2>
+
+        <div class="example-section">
+            <h3>train.py 中的 Hydra 装饰器</h3>
+            <pre><code>@hydra.main(config_path="config", config_name="train", version_base=None)
+def main(config: DictConfig):
+    # config 是一个 DictConfig 对象
+    # 可以像访问字典或对象一样访问配置
+
+    print(config.batch_size)        # 512
+    print(config.temporal_hidden_dims)  # 32
+    print(config.data.name)          # Istanbul</code></pre>
+
+            <p><strong>关键点</strong>：<code>@hydra.main</code> 装饰器自动加载配置并传入 <code>main</code> 函数。</p>
+        </div>
+
+        <div class="example-section">
+            <h3>configs.py 中的配置实例化</h3>
+            <pre><code>def instantiate_datamodule(config: DictConfig):
+    return DataModule(
+        config.root,              # "data/"
+        config.name,              # "Istanbul"
+        batch_size=config.batch_size,  # 512
+    )
+
+def instantiate_model(config: DictConfig, datamodule):
+    classifier = PointClassifier(
+        hidden_dims=config.temporal_hidden_dims,  # 32
+        layer=config.temporal_classifier_layer,   # 1
+    )
+    # ... 更多配置</code></pre>
+        </div>
+
+        <h2>🎯 命令行覆盖配置</h2>
+
+        <div class="example-section">
+            <p>Hydra 允许你在命令行中覆盖任何配置值：</p>
+            <pre><code># 使用默认配置运行
+python train.py
+
+# 覆盖 batch_size
+python train.py batch_size=256
+
+# 覆盖多个配置
+python train.py batch_size=128 temporal_hidden_dims=64
+
+# 切换数据集（通过配置组）
+python train.py data=another_dataset
+
+# 组合使用
+python train.py batch_size=64 data=data_set model=Marionette</code></pre>
+        </div>
+
+        <h2>📋 配置合并顺序</h2>
+
+        <p>在 <code>defaults</code> 列表中，<strong>后面的配置会覆盖前面的</strong>：</p>
+
+        <table>
+            <tr>
+                <th>顺序</th>
+                <th>配置文件</th>
+                <th>作用</th>
+            </tr>
+            <tr>
+                <td>1</td>
+                <td>data: data_set</td>
+                <td>加载数据配置</td>
+            </tr>
+            <tr>
+                <td>2</td>
+                <td>task: density</td>
+                <td>加载任务配置（可能覆盖 data 配置）</td>
+            </tr>
+            <tr>
+                <td>3</td>
+                <td>hydra: default</td>
+                <td>加载 Hydra 配置</td>
+            </tr>
+            <tr>
+                <td>4</td>
+                <td>_self_</td>
+                <td>当前文件的配置优先</td>
+            </tr>
+            <tr>
+                <td>5</td>
+                <td>model: Marionette</td>
+                <td>加载模型配置（优先级最高）</td>
+            </tr>
+        </table>
+
+        <div class="concept-box">
+            <h2>✨ Hydra 的优势</h2>
+
+            <h3>1. 模块化配置</h3>
+            <pre><code># 不同数据集可以使用相同的模型配置
+config/
+├── data/
+│   ├── Istanbul.yaml
+│   ├── Tokyo.yaml
+│   └── NYC.yaml
+├── model/
+│   ├── Marionette.yaml
+│   └── Baseline.yaml
+
+# 轻松切换
+python train.py data=Tokyo model=Baseline</code></pre>
+
+            <h3>2. 实验跟踪</h3>
+            <p>Hydra 自动为每次运行创建输出目录，保存配置和日志：</p>
+            <pre><code>outputs/
+├── 2023-10-01/
+│   ├── 12-30-45/
+│   │   ├── .hydra/
+│   │   │   ├── config.yaml    # 使用的配置
+│   │   │   └── overrides.yaml  # 命令行覆盖
+│   │   └── checkpoints/</code></pre>
+
+            <h3>3. 类型安全</h3>
+            <pre><code># YAML 中自动类型转换
+learning_rate: 0.001    # float
+batch_size: 512         # int
+use_gpu: true           # bool
+layers: [64, 128, 256]  # List[int]</code></pre>
+        </div>
+
+        <h2>🔗 配置与代码的连接</h2>
+
+        <div class="flow-diagram">
+            <div class="flow-item">YAML 配置</div>
+            <div class="arrow">→</div>
+            <div class="flow-item">Hydra 加载</div>
+            <div class="arrow">→</div>
+            <div class="flow-item">DictConfig</div>
+            <div class="arrow">→</div>
+            <div class="flow-item">configs.py</div>
+            <div class="arrow">→</div>
+            <div class="flow-item">实际对象</div>
+        </div>
+
+        <pre><code># 配置文件
+temporal_hidden_dims: 32
+
+# Hydra 加载后
+config.temporal_hidden_dims = 32
+
+# configs.py 实例化
+classifier = PointClassifier(
+    hidden_dims=config.temporal_hidden_dims  # 32
+)
+
+# 最终得到
+classifier = PointClassifier(hidden_dims=32)</code></pre>
+    </div>
+</body>
+</html>

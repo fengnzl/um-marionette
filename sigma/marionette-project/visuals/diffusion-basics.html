@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>扩散模型基础</title>
+    <style>
+        body {
+            font-family: 'Monaco', 'Menlo', monospace;
+            background: #1a1a2e;
+            color: #eee;
+            padding: 40px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #4e9af1;
+            border-bottom: 2px solid #4e9af1;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #00ff9d;
+            margin-top: 40px;
+        }
+        .concept-box {
+            background: #16213e;
+            padding: 25px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #4e9af1;
+        }
+        .analogy-box {
+            background: #16213e;
+            padding: 25px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #e94560;
+        }
+        .flow-diagram {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+        .flow-item {
+            background: #4e9af1;
+            color: #1a1a2e;
+            padding: 15px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            text-align: center;
+            min-width: 120px;
+        }
+        .arrow {
+            font-size: 2em;
+            color: #4e9af1;
+        }
+        pre {
+            background: #0f3460;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        code {
+            color: #00ff9d;
+        }
+        .highlight {
+            background: #e94560;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        .formula {
+            background: #0f3460;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            text-align: center;
+            font-size: 1.1em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌟 扩散模型基础入门</h1>
+
+        <div class="analogy-box">
+            <h2>🎨 从一个直观的例子开始</h2>
+            <p>想象你有一张<strong>清晰的照片</strong>，然后逐步添加<strong>噪点</strong>：</p>
+
+            <div class="flow-diagram">
+                <div class="flow-item">原始照片<br>x₀</div>
+                <div class="arrow">→</div>
+                <div class="flow-item">加一点噪点<br>x₁</div>
+                <div class="arrow">→</div>
+                <div class="flow-item">再加噪点<br>x₂</div>
+                <div class="arrow">→</div>
+                <div class="flow-item">...<br>xₙ</div>
+                <div class="arrow">→</div>
+                <div class="flow-item">纯噪声<br>x_N</div>
+            </div>
+
+            <p><strong>前向过程（加噪）</strong>：清晰照片 → 纯噪声</p>
+            <p><strong>反向过程（去噪）</strong>：纯噪声 → 清晰照片</p>
+
+            <p><strong>核心思想</strong>：如果我们能训练一个神经网络，学会<strong>如何从噪声中恢复出原始数据</strong>，就能生成新的数据！</p>
+        </div>
+
+        <div class="concept-box">
+            <h2>📊 扩散模型的两个过程</h2>
+
+            <h3>1️⃣ 前向扩散过程（Forward Diffusion）</h3>
+            <p>逐步向数据添加噪声，直到变成纯随机噪声。</p>
+
+            <div class="formula">
+                x₀ → x₁ → x₂ → ... → xₙ → ... → x_N
+            </div>
+
+            <p>数学表示：</p>
+            <pre><code># 每一步添加一点噪声
+xₙ = √(αₙ) · xₙ₋₁ + √(1 - αₙ) · ε
+
+其中：
+- αₙ：控制保留多少原始信息
+- ε：随机噪声（通常从正态分布采样）
+- n：当前步数（从 1 到 N）</code></pre>
+
+            <h3>2️⃣ 反向去噪过程（Reverse Diffusion）</h3>
+            <p>从纯噪声开始，逐步去除噪声，恢复出原始数据。</p>
+
+            <div class="formula">
+                x_N → x_{N-1} → ... → xₙ → xₙ₋₁ → ... → x₀
+            </div>
+
+            <p>数学表示：</p>
+            <pre><code># 神经网络预测噪声
+ε_θ(xₙ, n) = 神经网络预测的噪声
+
+# 去除噪声恢复前一步
+xₙ₋₁ = (xₙ - √(1 - αₙ) · ε_θ(xₙ, n)) / √(αₙ)</code></pre>
+        </div>
+
+        <div class="concept-box">
+            <h2>🧠 训练目标</h2>
+            <p>训练神经网络<strong>预测每一步添加的噪声</strong>：</p>
+
+            <pre><code># 给定加噪后的数据 xₙ 和步数 n
+# 神经网络要学会预测原始噪声 ε
+
+loss = MSE(ε_θ(xₙ, n), ε)
+
+其中：
+- ε：真实添加的噪声
+- ε_θ(xₙ, n)：神经网络预测的噪声
+- MSE：均方误差</code></pre>
+
+            <p><strong>关键点</strong>：同一个神经网络，在所有时间步 n 都能工作！</p>
+        </div>
+
+        <div class="concept-box">
+            <h2>🎯 Alpha 和 Beta 的关系</h2>
+            <p>在代码中（model.py 第 80-88 行）：</p>
+
+            <pre><code># 第 81-84 行：计算 beta schedule
+beta = betas_for_alpha_bar(
+    steps,
+    lambda n: math.cos((n + 0.008) / 1.008 * math.pi / 2) ** 2,
+)
+
+# 第 87-88 行：计算 alpha
+alpha = 1 - beta
+alpha_cumprod = torch.cumprod(alpha, dim=0)</code></pre>
+
+            <p><strong>参数含义</strong>：</p>
+            <ul>
+                <li><code>beta</code>：每步添加的噪声量（越大，噪声越多）</li>
+                <li><code>alpha = 1 - beta</code>：保留的原始信息比例</li>
+                <li><code>alpha_cumprod</code>：累积的 alpha，表示从 x₀ 到 xₙ 总共保留了多少信息</li>
+            </ul>
+
+            <div class="formula">
+                alpha_cumprod[n] = α₁ · α₂ · ... · αₙ
+            </div>
+        </div>
+
+        <div class="analogy-box">
+            <h2>💡 类比理解</h2>
+
+            <h3>类比 1：墨水在水中扩散</h3>
+            <ul>
+                <li><strong>前向过程</strong>：一滴墨水在水中逐渐扩散，最终均匀分布</li>
+                <li><strong>反向过程</strong>：让扩散的墨水重新聚集回一滴</li>
+            </ul>
+
+            <h3>类比 2：修复损坏的画作</h3>
+            <ul>
+                <li><strong>前向过程</strong>：画作逐渐被污损，直到无法辨认</li>
+                <li><strong>反向过程</strong>：修复师逐步清除污渍，恢复原作</li>
+            </ul>
+
+            <h3>类比 3：语音降噪</h3>
+            <ul>
+                <li><strong>前向过程</strong>：清晰语音逐渐被背景噪声淹没</li>
+                <li><strong>反向过程</strong>：降噪算法逐步去除噪声，恢复清晰语音</li>
+            </ul>
+        </div>
+
+        <div class="concept-box">
+            <h2>🔑 关键概念总结</h2>
+
+            <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+                <tr style="background: #4e9af1; color: #1a1a2e;">
+                    <th style="padding: 12px; border: 1px solid #4e9af1;">符号</th>
+                    <th style="padding: 12px; border: 1px solid #4e9af1;">含义</th>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #4e9af1;"><code>x₀</code></td>
+                    <td style="padding: 10px; border: 1px solid #4e9af1;">原始数据</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #4e9af1;"><code>xₙ</code></td>
+                    <td style="padding: 10px; border: 1px solid #4e9af1;">第 n 步的加噪数据</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #4e9af1;"><code>x_N</code></td>
+                    <td style="padding: 10px; border: 1px solid #4e9af1;">纯噪声</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #4e9af1;"><code>N</code></td>
+                    <td style="padding: 10px; border: 1px solid #4e9af1;">总扩散步数</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #4e9af1;"><code>αₙ</code></td>
+                    <td style="padding: 10px; border: 1px solid #4e9af1;">第 n 步保留信息的比例</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #4e9af1;"><code>ε</code></td>
+                    <td style="padding: 10px; border: 1px solid #4e9af1;">随机噪声</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #4e9af1;"><code>ε_θ</code></td>
+                    <td style="padding: 10px; border: 1px solid #4e9af1;">神经网络预测的噪声</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="concept-box">
+            <h2>📝 Marionette 中的扩散模型</h2>
+
+            <p>Marionette 使用的是 <strong>Add-Thin</strong> 扩散模型，专门用于<strong>时间点过程</strong>：</p>
+
+            <ul>
+                <li><strong>数据</strong>：事件序列（如用户签到时间戳）</li>
+                <li><strong>前向过程</strong>：逐步<strong>添加（Add）</strong>噪声事件</li>
+                <li><strong>反向过程</strong>：逐步<strong>删除（Thin）</strong>噪声事件</li>
+            </ul>
+
+            <p><strong>核心思想</strong>：通过添加和删除事件，学习生成真实的时间点序列！</p>
+        </div>
+    </div>
+</body>
+</html>

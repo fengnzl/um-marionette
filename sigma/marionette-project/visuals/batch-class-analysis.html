@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Batch 类分析</title>
+    <style>
+        body {
+            font-family: 'Monaco', 'Menlo', monospace;
+            background: #1a1a2e;
+            color: #eee;
+            padding: 40px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #4e9af1;
+            border-bottom: 2px solid #4e9af1;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #00ff9d;
+            margin-top: 40px;
+        }
+        .magic-method-box {
+            background: #16213e;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid #e94560;
+        }
+        pre {
+            background: #0f3460;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        code {
+            color: #00ff9d;
+        }
+        .highlight {
+            background: #e94560;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #4e9af1;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background: #4e9af1;
+            color: #1a1a2e;
+        }
+        .example-section {
+            background: #0f3460;
+            padding: 25px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Batch 类深度分析</h1>
+
+        <p><strong>位置</strong>: datamodule.py 第 158-697 行</p>
+
+        <h2>📦 Batch 类的作用</h2>
+        <p>Batch 类是一个<strong>智能容器</strong>，用于存储和处理一批序列数据。它不只是简单地把数据放在一起，还提供了很多方便的方法。</p>
+
+        <h2>🎭 Batch 类中的魔术方法</h2>
+
+        <div class="magic-method-box">
+            <h3>1️⃣ __len__ (第 227-228 行)</h3>
+            <pre><code>@property
+def batch_size(self) -> int:
+    return self.time.shape[0]
+
+def __len__(self):
+    return self.batch_size</code></pre>
+            <p><strong>作用</strong>: 让 <code>len(batch)</code> 返回 batch_size</p>
+            <pre><code>batch = Batch(...)
+len(batch)  # 返回 32（如果 batch_size=32）</code></pre>
+        </div>
+
+        <div class="magic-method-box">
+            <h3>2️⃣ __getitem__ (第 230-231 行)</h3>
+            <pre><code>def __getitem__(self, key: str):
+    return getattr(self, key, None)</code></pre>
+            <p><strong>作用</strong>: 让 Batch 像字典一样访问属性</p>
+            <pre><code>batch = Batch(...)
+batch['time']      # 等价于 batch.time
+batch['mask']      # 等价于 batch.mask
+batch['tau']       # 等价于 batch.tau</code></pre>
+        </div>
+
+        <div class="magic-method-box">
+            <h3>3️⃣ __setitem__ (第 233-234 行)</h3>
+            <pre><code>def __setitem__(self, key: str, value):
+    setattr(self, key, value)</code></pre>
+            <p><strong>作用</strong>: 让 Batch 像字典一样设置属性</p>
+            <pre><code>batch = Batch(...)
+batch['new_attr'] = some_value  # 等价于 batch.new_attr = some_value</code></pre>
+        </div>
+
+        <div class="magic-method-box">
+            <h3>4️⃣ __iter__ (第 241-244 行)</h3>
+            <pre><code>def __iter__(self):
+    for key in sorted(self.keys()):
+        yield key, self[key]</code></pre>
+            <p><strong>作用</strong>: 让 Batch 可以用 for 循环遍历</p>
+            <pre><code>batch = Batch(...)
+for key, value in batch:
+    print(f"{key}: {value.shape}")
+# 输出:
+# condition1: torch.Size([32, 100])
+# condition2: torch.Size([32, 100])
+# ...</code></pre>
+        </div>
+
+        <div class="magic-method-box">
+            <h3>5️⃣ __contains__ (第 246-247 行)</h3>
+            <pre><code>def __contains__(self, key):
+    return key in self.keys()</code></pre>
+            <p><strong>作用</strong>: 让 <code>in</code> 操作符可以工作</p>
+            <pre><code>batch = Batch(...)
+'time' in batch  # 返回 True
+'unknown' in batch  # 返回 False</code></pre>
+        </div>
+
+        <h2>🔧 核心方法：from_sequence_list (第 256-362 行)</h2>
+
+        <div class="example-section">
+            <h3>这是一个静态方法，也是一个 collate_fn！</h3>
+            <pre><code>@staticmethod
+def from_sequence_list(sequences: List[Sequence]) -> "Batch":
+    """
+    Create batch from list of sequences.
+    """</code></pre>
+
+            <h4>它做的事情：</h4>
+            <ol>
+                <li><strong>Padding（填充）</strong>: 将不同长度的序列填充到相同长度</li>
+                <li><strong>Mask（掩码）</strong>: 创建掩码标记真实数据和填充位置</li>
+                <li><strong>Stacking（堆叠）</strong>: 将多个序列堆叠成一个 batch</li>
+            </ol>
+
+            <h4>关键代码片段：</h4>
+            <pre><code># 第 264-267 行：填充 time
+time = pad(
+    [sequence.time for sequence in sequences],
+    length=tau.shape[-1]
+)
+
+# 第 321-324 行：创建 mask
+mask = (
+    torch.arange(0, tau.shape[-1], device=device)[None, :]
+    < sequence_length[:, None]
+)
+
+# 第 339-361 行：创建 Batch 对象
+batch = Batch(
+    mask=mask,
+    time=time,
+    ...
+)
+return batch</code></pre>
+        </div>
+
+        <h2>📊 Batch 对象的结构</h2>
+
+        <table>
+            <tr>
+                <th>属性名</th>
+                <th>形状</th>
+                <th>含义</th>
+            </tr>
+            <tr>
+                <td><code>time</code></td>
+                <td>[batch, sequence]</td>
+                <td>事件时间戳</td>
+            </tr>
+            <tr>
+                <td><code>tau</code></td>
+                <td>[batch, sequence]</td>
+                <td>事件间时间间隔</td>
+            </tr>
+            <tr>
+                <td><code>mask</code></td>
+                <td>[batch, sequence]</td>
+                <td>标记真实数据（1=真实，0=填充）</td>
+            </tr>
+            <tr>
+                <td><code>condition1-6</code></td>
+                <td>[batch, sequence]</td>
+                <td>6 种条件信息</td>
+            </tr>
+            <tr>
+                <td><code>unpadded_length</code></td>
+                <td>[batch]</td>
+                <td>每个序列的真实长度</td>
+            </tr>
+        </table>
+
+        <h2>💡 为什么 Batch 需要这么多魔术方法？</h2>
+
+        <p>这些魔术方法让 Batch 类<strong>既像对象，又像字典</strong>，使用起来非常灵活：</p>
+
+        <pre><code># 1. 像对象一样访问属性
+batch.time
+
+# 2. 像字典一样访问
+batch['time']
+
+# 3. 遍历所有属性
+for key, value in batch:
+    print(key, value.shape)
+
+# 4. 检查属性是否存在
+if 'mask' in batch:
+    print("Has mask!")
+
+# 5. 获取大小
+len(batch)  # batch_size</code></pre>
+
+        <p>这就是你在魔术方法章节学到的知识的<strong>实际应用</strong>！🎉</p>
+    </div>
+</body>
+</html>

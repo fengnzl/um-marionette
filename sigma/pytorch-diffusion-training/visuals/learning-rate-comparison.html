@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学习率可视化对比</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'SF Pro Display', -apple-system, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #eee;
+            padding: 40px 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 {
+            text-align: center;
+            margin-bottom: 40px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .comparison {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+        }
+        .panel {
+            background: rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 25px;
+            border: 2px solid rgba(102, 126, 234, 0.3);
+        }
+        .panel h2 {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .emoji { font-size: 1.5em; }
+        canvas {
+            width: 100%;
+            height: 200px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .description {
+            color: #8892b0;
+            line-height: 1.6;
+        }
+        .key-point {
+            background: rgba(102, 126, 234, 0.2);
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 15px;
+            border-left: 3px solid #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📈 学习率：太小 vs 太大 vs 刚刚好</h1>
+
+        <div class="comparison">
+            <div class="panel" style="border-color: #4caf50;">
+                <h2><span class="emoji">🐢</span> 学习率太小</h2>
+                <canvas id="smallLR"></canvas>
+                <p class="description">
+                    像乌龟一样缓慢移动。每一步都很谨慎，但要到达最低点需要走成千上万步。
+                </p>
+                <div class="key-point">
+                    <strong>问题：</strong>训练时间极长，可能陷入局部最优
+                </div>
+            </div>
+
+            <div class="panel" style="border-color: #ffeb3b;">
+                <h2><span class="emoji">⚖️</span> 学习率合适</h2>
+                <canvas id="goodLR"></canvas>
+                <p class="description">
+                    像经验丰富的登山者。步幅恰到好处，快速稳定地找到最低点。
+                </p>
+                <div class="key-point">
+                    <strong>理想状态：</strong>收敛快且稳定
+                </div>
+            </div>
+
+            <div class="panel" style="border-color: #f44336;">
+                <h2><span class="emoji">🐇</span> 学习率太大</h2>
+                <canvas id="largeLR"></canvas>
+                <p class="description">
+                    像兔子一样跳跃！每次都跨过最低点，在山谷两侧来回震荡。
+                </p>
+                <div class="key-point">
+                    <strong>问题：</strong>无法收敛，甚至可能发散（越来越远）
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function drawLandscape(canvasId, lr, color) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            canvas.width = canvas.offsetWidth * 2;
+            canvas.height = 400;
+            ctx.scale(2, 2);
+
+            const width = canvas.offsetWidth;
+            const height = 200;
+
+            // Draw valley curve
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+            ctx.lineWidth = 2;
+            for (let x = 0; x < width; x++) {
+                const y = 30 + 0.0015 * Math.pow(x - width/2, 2);
+                if (x === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+
+            // Simulate gradient descent path
+            let x = 20;
+            const points = [];
+            for (let i = 0; i < 50; i++) {
+                const gradient = 0.003 * (x - width/2);
+                x = x - lr * gradient;
+                const y = 30 + 0.0015 * Math.pow(x - width/2, 2);
+                points.push({x, y});
+                if (Math.abs(x - width/2) < 1) break;
+            }
+
+            // Draw path
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 3;
+            points.forEach((p, i) => {
+                if (i === 0) ctx.moveTo(p.x, p.y - 10);
+                else ctx.lineTo(p.x, p.y - 10);
+            });
+            ctx.stroke();
+
+            // Draw dots
+            points.forEach((p, i) => {
+                if (i % 5 === 0) {
+                    ctx.beginPath();
+                    ctx.fillStyle = color;
+                    ctx.arc(p.x, p.y - 10, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+
+            // Mark minimum
+            ctx.beginPath();
+            ctx.fillStyle = '#4caf50';
+            ctx.arc(width/2, 30, 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.font = '10px sans-serif';
+            ctx.fillText('最低点', width/2 + 10, 33);
+        }
+
+        setTimeout(() => {
+            drawLandscape('smallLR', 15, '#4caf50');
+            drawLandscape('goodLR', 50, '#ffeb3b');
+            drawLandscape('largeLR', 120, '#f44336');
+        }, 100);
+    </script>
+</body>
+</html>

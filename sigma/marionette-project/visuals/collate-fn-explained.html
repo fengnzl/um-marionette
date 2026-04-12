@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>collate_fn 详解</title>
+    <style>
+        body {
+            font-family: 'Monaco', 'Menlo', monospace;
+            background: #1a1a2e;
+            color: #eee;
+            padding: 40px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #4e9af1;
+            border-bottom: 2px solid #4e9af1;
+            padding-bottom: 10px;
+        }
+        .example-box {
+            background: #16213e;
+            padding: 25px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #e94560;
+        }
+        .success-box {
+            background: #16213e;
+            padding: 25px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #00ff9d;
+        }
+        pre {
+            background: #0f3460;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        code {
+            color: #00ff9d;
+        }
+        .highlight {
+            background: #e94560;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 collate_fn 详解</h1>
+
+        <div class="example-box">
+            <h2>❌ 没有 collate_fn 的问题</h2>
+            <p>假设你的 Dataset 返回的是变长序列：</p>
+            <pre><code># Dataset 的 __getitem__ 返回：
+dataset[0] = [1, 2, 3]           # 长度 3
+dataset[1] = [4, 5, 6, 7, 8]     # 长度 5
+dataset[2] = [9, 10]             # 长度 2
+
+# DataLoader 默认行为：
+batch = [dataset[0], dataset[1], dataset[2]]
+# batch = [[1,2,3], [4,5,6,7,8], [9,10]]
+# 这是一个列表，不是 tensor！</code></pre>
+
+            <p><strong>问题</strong>：你得到的是一个列表，不是 tensor，无法直接输入模型！</p>
+        </div>
+
+        <div class="success-box">
+            <h2>✅ 使用 collate_fn 解决</h2>
+            <pre><code>def my_collate_fn(batch):
+    """
+    batch: [[1,2,3], [4,5,6,7,8], [9,10]]
+    """
+    # 1. 找到最长序列
+    max_len = max(len(seq) for seq in batch)
+
+    # 2. 填充到相同长度
+    padded = []
+    for seq in batch:
+        pad_len = max_len - len(seq)
+        padded_seq = seq + [0] * pad_len  # 用 0 填充
+        padded.append(padded_seq)
+
+    # 3. 创建 mask
+    mask = []
+    for seq in batch:
+        seq_mask = [1] * len(seq) + [0] * (max_len - len(seq))
+        mask.append(seq_mask)
+
+    # 4. 转换为 tensor
+    padded_tensor = torch.tensor(padded)      # [3, 5]
+    mask_tensor = torch.tensor(mask)          # [3, 5]
+
+    return {'data': padded_tensor, 'mask': mask_tensor}
+
+# 使用自定义 collate_fn
+dataloader = DataLoader(dataset, collate_fn=my_collate_fn)
+
+# 现在每个 batch 都是：
+# {
+#     'data': tensor([[1, 2, 3, 0, 0],
+#                     [4, 5, 6, 7, 8],
+#                     [9, 10, 0, 0, 0]]),
+#     'mask': tensor([[1, 1, 1, 0, 0],
+#                     [1, 1, 1, 1, 1],
+#                     [1, 1, 0, 0, 0]])
+# }</code></pre>
+        </div>
+
+        <div class="success-box">
+            <h2>🎯 Marionette 项目中的 collate_fn</h2>
+            <p>在 datamodule.py 第 822 行：</p>
+            <pre><code>return DataLoader(
+    self.train_data,
+    batch_size=self.batch_size,
+    collate_fn=<span class="highlight">Batch.from_sequence_list</span>,  # ← 这里！
+    ...
+)</code></pre>
+
+            <p><code>Batch.from_sequence_list</code> 就是一个 collate_fn！</p>
+            <p>它接收一个 <code>List[Sequence]</code>，返回一个 <code>Batch</code> 对象。</p>
+        </div>
+    </div>
+</body>
+</html>

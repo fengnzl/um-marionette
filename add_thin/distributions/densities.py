@@ -3,39 +3,57 @@ import torch.distributions as D
 
 
 class Normal(D.Normal):
+    """
+    特制的“单向（截断）正态分布”工具。
+    外行理解：现实中有些事情是不可能发生“负数”的。比如等一个人还要多久？不可能等个 -10 分钟。
+    但基础的正态分布曲线是左右无限延伸包含负数的。这个类就是为了把原本的标准正态分布在 0 的位置活生生切断，只保留正数部分。
+    """
     def __init__(
         self,
         mean: torch.Tensor,
         std: torch.Tensor,
     ) -> None:
         """
-        Intantiate normal with specific mean and variance.
-
-        Parameters:
-        ----------
-        mean : torch.Tensor
-            Mean of the normal distribution.
-        std : torch.Tensor
-            Standard deviation of the normal distribution.
+        用特定的均值和方差来初始化这个特制正态。
         """
-        # TODO might want to change std and mean
+        
+        # 稳定性大招：神经网络自己吐出来的结果可能是乱七八糟的正负几万的巨量数字。
+        # 如果直接把几万拿去算概率，电脑会直接罢工报 NaN（非数错误）。
+        
+        # 把神经网络输出的任意数字，强行变成合法的正态分布参数。
+        # 1. mean.sigmoid()：强制把预测均值压缩/拉回到 0 到 1 的安全系数内部。
+        # 2. torch.exp(-torch.abs(std))：用绝对值再套自然常数负指数，强制把标准差锁死在 0 到 1 之间的一点点正数，绝对不让它爆炸。
+        
+        # super().__init__ 调用底层的 PyTorch 正规正态分布公式去真正建立。
         super().__init__(mean.sigmoid(), torch.exp(-torch.abs(std)))
+
 
     def cdf(self, x: torch.Tensor) -> torch.Tensor:
         """
-        Change cdf to be on [0, x].
-
-        Parameters:
-        ----------
-        x : torch.Tensor
-            Input tensor.
-
-        Returns:
-        -------
-        torch.Tensor
-            Truncated CDF of the input tensor.
+        CDF（累积分布函数）计算器。
+        外行理解：你抛骰子抛出小于等于 4 的概率。
+        由于我们把原本包含负数的钟形曲线在 0 刻度那里“一刀切”了，所以原本从负无穷到现在所累积的概率也就不准了。
         """
+        # 我们用原配的系统函数算一下从无穷小一直累加到 x 的所有概率
+        # 再霸道地减掉系统中从无穷小累加到 0 的那一段不存在的概率。
+        # 结果代表：这件随机发生的事，其变量规规矩矩只落在 [0, x] 阳间区域内的真实概率。
+        # super().cdf(x) = 原来的正态分布从 -∞ 到 x 的累计概率
+        # cdf(x) = 正态分布 P(X ≤ x) - 正态分布 P(X ≤ 0)
         return super().cdf(x) - super().cdf(torch.zeros_like(x))
 
-
+# 弄一个对外的花名册，方便根据名字抓取这个配方类
 DISTRIBUTIONS = {"normal": Normal}
+
+"""
+========================================================================
+【给外行新手的通俗讲解】 -- add_thin/distributions/densities.py
+========================================================================
+
+1. 机器为什么需要这么死板地规定不能是负数？
+   - 做模型推演时，它经常像个盲目的算盘仪。如果没有我们在代码里加这些“物理常识锁”，它计算两件事发生的发生间隔（tau）时，很可能算出一个“两件事隔了 -5 分钟发生”，这在物理上直接就崩坏了。
+   
+2. 为什么不用 ReLU 函数截断，而是用复杂的 Sigmoid 和 Exp ？
+   - ReLU 切割法太生硬，直接把负的一半全部变成极其死板的 0。这会让网络后面的概率计算求导时遭遇“死角”，机器就没法靠微积分修正自己了（梯度消失）。
+   - 用平滑的指数曲线把它“温柔地揉捏、平滑地压缩”进正数空间，保证了它就算偏离再远，导师也能把它顺藤摸瓜拽回来。
+========================================================================
+"""

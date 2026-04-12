@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>训练流程详解</title>
+    <style>
+        body {
+            font-family: 'Monaco', 'Menlo', monospace;
+            background: #1a1a2e;
+            color: #eee;
+            padding: 40px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #4e9af1;
+            border-bottom: 2px solid #4e9af1;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #00ff9d;
+            margin-top: 40px;
+        }
+        .code-section {
+            background: #0f3460;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        pre {
+            background: #16213e;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        code {
+            color: #00ff9d;
+        }
+        .highlight {
+            background: #e94560;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        .flow-diagram {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        .flow-item {
+            background: #4e9af1;
+            color: #1a1a2e;
+            padding: 12px 18px;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+        .arrow {
+            font-size: 1.8em;
+            color: #4e9af1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎓 训练流程详解</h1>
+
+        <div class="code-section">
+            <h2>📋 完整的训练步骤</h2>
+
+            <h3>第 1 步：前向传播（计算预测）</h3>
+            <pre><code># tasks.py 第 74-79 行
+def step(self, batch, name):
+    # Forward pass
+    x_n_int_x_0, log_prob_x_0, x_n = self.tpp_model.forward(batch)
+
+    # 返回三个结果：
+    # 1. x_n_int_x_0: 神经网络预测的"事件是否属于原始数据"
+    # 2. log_prob_x_0: 事件的似然概率
+    # 3. x_n: 加噪后的数据</code></pre>
+
+            <h3>第 2 步：计算损失</h3>
+            <pre><code># tasks.py 第 82-90 行
+# Spatial loss (离散扩散模型的损失)
+spatial_loss = self.discrete_diffusion.training_losses(batch).mean()
+
+# Temporal loss (Add-Thin 的损失)
+temporal_loss, classification, intensity = self.get_loss(
+    log_prob_x_0, x_n_int_x_0, x_n
+)
+
+# 总损失
+total_loss = spatial_loss + temporal_loss</code></pre>
+
+            <h3>第 3 步：反向传播和参数更新</h3>
+            <pre><code># tasks.py 第 146-157 行
+def training_step(self, batch, batch_idx):
+    loss_temporal, loss_spatial, loss_all = self.step(batch, "train")
+
+    opt1, opt2 = self.optimizers()
+
+    # 更新 temporal 模型
+    opt1.zero_grad()                    # 清空梯度
+    self.manual_backward(loss_temporal)  # 计算梯度
+    opt1.step()                         # 更新参数
+
+    # 更新 spatial 模型
+    opt2.zero_grad()                    # 清空梯度
+    self.manual_backward(loss_spatial)  # 计算梯度
+    opt2.step()                         # 更新参数</code></pre>
+        </div>
+
+        <div class="code-section">
+            <h2>🔄 训练流程图</h2>
+
+            <div class="flow-diagram">
+                <div class="flow-item">原始数据 x₀</div>
+                <div class="arrow">→</div>
+                <div class="flow-item">加噪得到 xₙ</div>
+                <div class="arrow">→</div>
+                <div class="flow-item">神经网络预测</div>
+                <div class="arrow">→</div>
+                <div class="flow-item">计算损失</div>
+                <div class="arrow">→</div>
+                <div class="flow-item">反向传播</div>
+                <div class="arrow">→</div>
+                <div class="flow-item">更新参数</div>
+            </div>
+        </div>
+
+        <div class="code-section">
+            <h2>💡 损失函数详解</h2>
+
+            <h3>1. Classification Loss（分类损失）</h3>
+            <pre><code># tasks.py 第 46-54 行
+def classification_loss(self, x_n_int_x_0, x_n: Batch):
+    """
+    计算二元交叉熵损失
+    """
+    x_n_int_x_0 = x_n_int_x_0.flatten()[x_n.mask.flatten()]
+    target = x_n.kept.flatten()[x_n.mask.flatten()]
+    loss = self.classification_loss_func(x_n_int_x_0, target.float())
+    loss = (loss).sum() / len(x_n)
+    return loss</code></pre>
+
+            <p><strong>理解要点</strong>：</p>
+            <ul>
+                <li>神经网络预测每个事件是否属于原始数据</li>
+                <li>使用 BCE（二元交叉熵）损失</li>
+                <li>目标是让预测尽可能接近真实标签</li>
+            </ul>
+
+            <h3>2. Intensity Loss（强度损失）</h3>
+            <pre><code># tasks.py 第 56-60 行
+def intensity_loss(self, log_prob_x_0):
+    """
+    计算负对数似然
+    """
+    return -log_prob_x_0.mean()</code></pre>
+
+            <p><strong>理解要点</strong>：</p>
+            <ul>
+                <li>评估事件序列的似然概率</li>
+                <li>目标是让模型生成高似然概率的事件</li>
+                <li>负号是因为我们想最大化似然，但优化器是最小化</li>
+            </ul>
+        </div>
+
+        <div class="code-section">
+            <h2>🎯 训练的关键点</h2>
+
+            <h3>为什么有两个优化器？</h3>
+            <pre><code># tasks.py 第 122-125 行
+def configure_optimizers(self):
+    # temporal 模型的优化器（Add-Thin）
+    optimizer1 = torch.optim.Adam(
+        self.tpp_model.parameters(),
+        lr=self.learning_rate1
+    )
+
+    # spatial 模型的优化器（离散扩散）
+    optimizer2 = torch.optim.AdamW(
+        self.discrete_diffusion.parameters(),
+        lr=self.learning_rate2
+    )</code></pre>
+
+            <p><strong>原因</strong>：</p>
+            <ul>
+                <li>Marionette 有<strong>两个独立的模型</strong></li>
+                <li>Temporal 模型：处理事件时间（Add-Thin）</li>
+                <li>Spatial 模型：处理事件类型（离散扩散）</li>
+                <li>它们需要不同的学习率和优化策略</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

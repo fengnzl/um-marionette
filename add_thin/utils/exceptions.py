@@ -2,41 +2,79 @@ import functools as ft
 import re
 import traceback as tb
 
+# 编译一段正则表达式，用于抓取诸如 "TPU available: " 或者 "IPU available: " 之类的日志信息头部
 DEVICE_AVAILABLE = re.compile("[TIH]PU available: ")
 
 
 def filter_device_available(record):
-    """Filter the availability report for all the devices we don't have."""
+    """
+    过滤在打印那些我们电脑根本就没有的设备（如 TPU, IPU）时的系统默认检测报告噪音。
+    外行理解：就是个“消音器”。本来框架每次启动都会絮絮叨叨嚷嚷说“咱们没装最新型超算机器卡 TPU 呀～”，
+    加了它，就把这句无聊的话给屏蔽掉不打印了。
+    返回 True 则该条记录正常展示，返回 False 则拦截屏蔽该记录。
+    """
     return not DEVICE_AVAILABLE.match(record.msg)
 
+
 class ExceptionPrinter:
+    """
+    错误打印机：一个用来“拯救报错信息”的小工具层。
+    """
     def __init__(self, f):
+        # f 代表了被我们包裹保护在里面的核心业务代码函数。
         self.f = f
 
     def __call__(self, *args, **kwargs):
+        # 当我们的整个类像普通函数那样被人唤醒调用执行时触发这个环节
         try:
+            # 正常尝试去跑被保护的那个核心函数
             return self.f(*args, **kwargs)
         except Exception as e:
+            # 万一它在执行时出错了（Exception抛出了异常）
+            # 不要让程序背着我们就死掉了！立刻将红彤彤的错误堆栈连条理给强行打印到屏幕上
             tb.print_exception(e)
+            # 最后仍然负责任地把错误接着往上报废（确保它应该崩溃时还是得崩溃，只不过必须死得明明白白）
             raise
-
+    
     def __getattr__(self, attr):
-        # This method is called during unpickling, e.g. when submitting a job to slurm,
-        # before restoring its internal state. In that case, just report any attribute
-        # as not found to avoid an infinite recursion.
+        # 当别人在这个打印机的外壳上，试图获取某种我们本来没有持有的属性的时候
+        
+        # 特别是在被打包序列化（Pickle）或是跨集群通过 slurm 提交远端运行时
+        # 这个特殊的阶段，系统内变量会被搬运拆包，如果发现连最本命的被包裹的小函数 f 都不存在了...
         if "f" not in self.__dict__:
+            # 赶紧果断报错：我不拥有这个属性，不然系统有可能因为来回盲查而掉进死胡同无限死循环报错。
             raise AttributeError()
 
-        # Hack so that hydra.main can access the __code__ attribute of f and determine
-        # the calling file
+        # 如果这个方法上面正常持有一个 f，那么就把那些针对打印机这层外壳的需求，
+        # 全部像透明玻璃一样反向击穿，让别人能顺畅地透过外壳读到原本 f 函数身带的特征信息（如它被定义在哪里，原名叫啥）。
+        # 这个小魔法主要为了给 Hydra (主流环境配置框架) 提供无缝后门存有支持。
         return getattr(self.f, attr)
 
 
 def print_exceptions(f):
-    """Print any exception raised by the annotated function to stderr
-
-    This is helpful if an outer function swallows exceptions, such as the hydra's
-    submitit launcher.
     """
-
+    这是一个供开发者随意安插在代码头上（即 @print_exceptions 装饰器形式）的使用器。
+    它用于把被修饰的目标函数，无缝套上一件我们上边写的 ExceptionPrinter 防护马甲。
+    
+    外行理解：有的上层控制环境（比如某些大型服务器远端环境或者某些老旧调度器 submitit），
+    它们有个臭脾气，只要发现下边崩溃了就偷偷在内部消化掉了，不再黑屏终端抛出具体为什么出错。
+    你用了这个之后，哪怕天王老子要“吞错误”，这个强制输出打印机也会顶着壳第一时间把错误大头照死贴在终端屏幕面板上。
+    """
+    # ft.wraps 是个魔法易容术，防止套了马甲以后，外面的人认不出原来函数长啥样、叫什么名字或有什么文档了。
     return ft.wraps(f)(ExceptionPrinter(f))
+
+"""
+========================================================================
+【给外行新手的通俗讲解】 -- add_thin/utils/exceptions.py
+========================================================================
+
+1. 什么是“吞异常”现象？
+   - 程序开发中，最可怕的不是你写的代码满屏跑红字报错（告诉你哪错了），
+   - 而是有些复杂的超级框架自作主张：“哟，兄弟出错啦？为了不吓到人我悄悄把页面关掉清零吧。”
+   - 结果开发者面对一个凭空蒸发停止运算的黑屏幕，死活查不出到底哪里有问题，非常折磨。
+
+2. 这个工具的存在意义？
+   - 就是强行在可能发生故障的核心代码周围布下一片“监控录像（try/except 配合 ExceptionPrinter）”。
+   - 管你上边的官老爷想怎么掩盖故障，只要你在执行业务代码时一出车祸，这段小代码就会趁被强行关闭前的一瞬间，把“车祸第一案发现场全息影像（黑屏追踪记录信息 traceback）”打印发推出去挂在公屏上，让你找bug不再抓瞎。
+========================================================================
+"""

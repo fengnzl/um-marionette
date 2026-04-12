@@ -1,5 +1,6 @@
 import torch
 import argparse
+import json
 from evaluate_utils import get_task, get_run_data
 
 
@@ -29,6 +30,20 @@ def simulation(RUN_ID = "marionette", WANDB_DIR = "wandb", PROJECT_ROOT = "./"):
 
     data_new = {'sequences':generated_seqs,'t_max': batch.tmax.detach().cpu().numpy()}
     torch.save(data_new,f'./data/{data_name}/{data_name}_{RUN_ID}_generated.pkl')
+
+    deckgl_data = []
+    for seq in generated_seqs:
+        deckgl_data.append({
+            "path": seq["gps"],
+            "timestamps": seq["arrival_times"].tolist(),
+            "marks": seq["marks"].tolist(),
+            "checkins": seq["checkins"].tolist()
+        })
+    
+    json_path = f'./data/{data_name}/{data_name}_{RUN_ID}_generated.json'
+    with open(json_path, 'w') as f:
+        json.dump(deckgl_data, f)
+    print(f"Generated sample saved to JSON for Deck.gl visualization at: {json_path}")
 
 
 

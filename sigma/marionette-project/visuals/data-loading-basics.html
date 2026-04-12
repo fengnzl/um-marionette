@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PyTorch 数据加载基础</title>
+    <style>
+        body {
+            font-family: 'Monaco', 'Menlo', monospace;
+            background: #1a1a2e;
+            color: #eee;
+            padding: 40px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #4e9af1;
+            border-bottom: 2px solid #4e9af1;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #00ff9d;
+            margin-top: 40px;
+        }
+        .concept-box {
+            background: #16213e;
+            padding: 25px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #4e9af1;
+        }
+        .flow-diagram {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+        .flow-item {
+            background: #4e9af1;
+            color: #1a1a2e;
+            padding: 15px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            text-align: center;
+            min-width: 120px;
+        }
+        .arrow {
+            font-size: 2em;
+            color: #4e9af1;
+        }
+        pre {
+            background: #0f3460;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        code {
+            color: #00ff9d;
+        }
+        .highlight {
+            background: #e94560;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #4e9af1;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background: #4e9af1;
+            color: #1a1a2e;
+        }
+        .component-card {
+            background: #0f3460;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .component-title {
+            color: #00ff9d;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 PyTorch 数据加载基础</h1>
+
+        <div class="concept-box">
+            <h2>为什么需要数据加载？</h2>
+            <p>深度学习需要处理大量数据。我们不能一次性把所有数据加载到内存中，而是需要：</p>
+            <ul>
+                <li><strong>分批处理</strong>：每次只处理一小批数据 (batch)</li>
+                <li><strong>并行加载</strong>：在 GPU 训练的同时，CPU 准备下一批数据</li>
+                <li><strong>数据增强</strong>：在加载时对数据进行预处理</li>
+                <li><strong>打乱顺序</strong>：每个 epoch 随机打乱数据顺序</li>
+            </ul>
+        </div>
+
+        <div class="concept-box">
+            <h2>数据加载的 4 个核心组件</h2>
+
+            <div class="flow-diagram">
+                <div class="flow-item">原始数据</div>
+                <div class="arrow">→</div>
+                <div class="flow-item">Dataset</div>
+                <div class="arrow">→</div>
+                <div class="flow-item">DataLoader</div>
+                <div class="arrow">→</div>
+                <div class="flow-item">Batch</div>
+            </div>
+
+            <div class="component-card">
+                <div class="component-title">1️⃣ Dataset（数据集）</div>
+                <p>职责：<strong>访问单个数据样本</strong></p>
+                <pre><code>class MyDataset(torch.utils.data.Dataset):
+    def __len__(self):
+        return len(data)  # 数据集大小
+
+    def __getitem__(self, idx):
+        return data[idx]  # 返回第 idx 个样本</code></pre>
+                <p><strong>关键点</strong>：只负责<strong>读取</strong>一个样本，不负责批处理</p>
+            </div>
+
+            <div class="component-card">
+                <div class="component-title">2️⃣ DataLoader（数据加载器）</div>
+                <p>职责：<strong>将多个样本组合成批次</strong></p>
+                <pre><code>dataloader = DataLoader(
+    dataset,
+    batch_size=32,      # 每批 32 个样本
+    shuffle=True,       # 每个 epoch 打乱顺序
+    num_workers=4,      # 4 个进程并行加载
+)</code></pre>
+                <p><strong>关键点</strong>：DataLoader 会自动调用 Dataset 的 <code>__getitem__</code></p>
+            </div>
+
+            <div class="component-card">
+                <div class="component-title">3️⃣ collate_fn（整理函数）</div>
+                <p>职责：<strong>将多个样本整理成一个批次</strong></p>
+                <pre><code>def my_collate_fn(batch):
+    # batch 是一个列表: [sample1, sample2, ...]
+    # 将它们转换成一个 tensor
+    return torch.stack(batch)
+
+dataloader = DataLoader(
+    dataset,
+    batch_size=32,
+    collate_fn=my_collate_fn,  # 自定义整理函数
+)</code></pre>
+                <p><strong>关键点</strong>：当样本长度不一致时，需要自定义 collate_fn</p>
+            </div>
+
+            <div class="component-card">
+                <div class="component-title">4️⃣ Batch（批次）</div>
+                <p>职责：<strong>存储一批数据</strong></p>
+                <pre><code># 一个典型的 batch:
+batch = {
+    'x': tensor([[...], [...], ...]),  # [batch_size, features]
+    'y': tensor([0, 1, 0, ...]),       # [batch_size]
+}</code></pre>
+                <p><strong>关键点</strong>：Batch 中所有样本的第一维都是 batch_size</p>
+            </div>
+        </div>
+
+        <div class="concept-box">
+            <h2>完整的数据流</h2>
+            <pre><code># 1. 创建 Dataset
+dataset = MyDataset(data)  # 封装数据访问
+
+# 2. 创建 DataLoader
+dataloader = DataLoader(
+    dataset,
+    batch_size=32,
+    shuffle=True,
+)
+
+# 3. 训练循环中使用
+for batch in dataloader:
+    # 每个 batch 自动包含 32 个样本
+    x, y = batch['x'], batch['y']
+    output = model(x)
+    loss = criterion(output, y)
+    loss.backward()
+    optimizer.step()</code></pre>
+        </div>
+
+        <div class="concept-box">
+            <h2>变长序列的处理</h2>
+            <p>在序列数据（如文本、时间序列）中，不同样本的长度往往不同：</p>
+
+            <h3>❌ 问题：不能直接堆叠</h3>
+            <pre><code># 样本 1: [1, 2, 3]       # 长度 3
+# 样本 2: [4, 5, 6, 7, 8]  # 长度 5
+
+# 直接 stack 会报错！
+torch.stack([sample1, sample2])  # ❌ Error!</code></pre>
+
+            <h3>✅ 解决：Padding（填充）</h3>
+            <pre><code># 填充到相同长度
+# 样本 1: [1, 2, 3, 0, 0]    # 用 0 填充
+# 样本 2: [4, 5, 6, 7, 8]   # 不需要填充
+
+# 现在可以堆叠了
+batch = torch.stack([padded_sample1, sample2])
+# batch: [[1, 2, 3, 0, 0],
+#         [4, 5, 6, 7, 8]]</code></pre>
+
+            <h3>🎭 Mask（掩码）</h3>
+            <p>填充后需要记录哪些是真实数据，哪些是填充：</p>
+            <pre><code>mask = [[1, 1, 1, 0, 0],   # 样本 1: 前 3 个是真实数据
+        [1, 1, 1, 1, 1]]   # 样本 2: 全部是真实数据
+
+# 使用时:
+valid_data = data * mask  # 填充位置变成 0</code></pre>
+        </div>
+    </div>
+</body>
+</html>

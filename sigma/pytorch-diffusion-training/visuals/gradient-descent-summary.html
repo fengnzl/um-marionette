@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>梯度下降 - 教学笔记</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'SF Pro Display', -apple-system, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #eee;
+            padding: 40px 20px;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 {
+            text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 40px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 25px;
+            border: 2px solid rgba(102, 126, 234, 0.3);
+        }
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+        .analogy {
+            font-size: 1.3em;
+            text-align: center;
+            padding: 25px;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
+            border-radius: 12px;
+            margin: 25px 0;
+            font-style: italic;
+        }
+        .key-points {
+            list-style: none;
+            padding: 0;
+        }
+        .key-points li {
+            padding: 15px;
+            margin-bottom: 12px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            line-height: 1.6;
+        }
+        .formula {
+            background: rgba(0,0,0,0.4);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 1.4em;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+        }
+        .warning {
+            background: rgba(244, 67, 54, 0.2);
+            border-left-color: #f44336;
+        }
+        .success {
+            background: rgba(76, 175, 80, 0.2);
+            border-left-color: #4caf50;
+        }
+        .mastery-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #4caf50, #45a049);
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏔️ 梯度下降 - 掌握确认</h1>
+        <div style="text-align: center;">
+            <span class="mastery-badge">✓ 概念已掌握</span>
+        </div>
+
+        <div class="analogy">
+            "把梯度下降想象成<strong>夜晚找山谷最低点</strong><br>
+            关键在于：<strong>沿着最陡的下坡方向，一步步移动</strong><br>
+            记住：<strong>梯度指向的是上坡！所以要减去梯度</strong>"
+        </div>
+
+        <div class="card">
+            <h2>🎯 核心公式</h2>
+            <div class="formula">
+                参数 = 参数 - 学习率 × 梯度
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📚 关键要点</h2>
+            <ul class="key-points">
+                <li>
+                    <strong>梯度的两个组成部分：</strong><br>
+                    • 方向：告诉往哪走<br>
+                    • 大小：告诉坡有多陡
+                </li>
+                <li>
+                    <strong>梯度的方向：</strong><br>
+                    梯度指向函数增长最快的方向（上坡）<br>
+                    所以要减去梯度才能下山
+                </li>
+                <li>
+                    <strong>学习率的作用：</strong><br>
+                    太小 → 像乌龟，训练慢<br>
+                    太大 → 像兔子，震荡不收敛<br>
+                    合适 → 快速稳定到达最低点
+                </li>
+                <li class="success">
+                    <strong>收敛条件：</strong><br>
+                    梯度 ≈ 0 时，说明已到达最低点
+                </li>
+                <li>
+                    <strong>高维空间：</strong><br>
+                    每个参数都有自己的梯度，并行更新
+                </li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <h2>⚠️ 常见陷阱（你已成功避开！）</h2>
+            <ul class="key-points">
+                <li class="warning">
+                    ❌ 误解：梯度指向下山方向<br>
+                    ✓ 正确：梯度指向上坡，所以要减去梯度
+                </li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <h2>🚀 下一步：损失函数</h2>
+            <p style="color: #8892b0; line-height: 1.6;">
+                现在你理解了如何"下山"，下一个问题是：<br>
+                <strong>我们要最小化的是什么？</strong><br><br>
+                损失函数定义了什么是"好"的模型，让梯度下降有明确的目标。
+            </p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>nn.Module 调用方式对比</title>
+    <style>
+        body {
+            font-family: 'Monaco', 'Menlo', monospace;
+            background: #1a1a2e;
+            color: #eee;
+            padding: 40px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #4e9af1;
+            border-bottom: 2px solid #4e9af1;
+            padding-bottom: 10px;
+        }
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin: 30px 0;
+        }
+        .method {
+            background: #16213e;
+            padding: 25px;
+            border-radius: 8px;
+            border: 2px solid #0f3460;
+        }
+        .method.recommended {
+            border-color: #4e9af1;
+            background: #1a1a2e;
+        }
+        .method.not-recommended {
+            border-color: #e94560;
+        }
+        .method-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .recommended .method-title {
+            background: #4e9af1;
+            color: #1a1a2e;
+        }
+        .not-recommended .method-title {
+            background: #e94560;
+            color: #1a1a2e;
+        }
+        pre {
+            background: #0f3460;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+        code {
+            color: #00ff9d;
+        }
+        .why-it-matters {
+            background: #0f3460;
+            padding: 25px;
+            border-radius: 8px;
+            margin: 30px 0;
+            border-left: 4px solid #4e9af1;
+        }
+        .why-it-matters h3 {
+            color: #4e9af1;
+            margin-top: 0;
+        }
+        .hooks-list {
+            margin: 20px 0;
+            padding-left: 20px;
+        }
+        .hooks-list li {
+            margin: 10px 0;
+            color: #00ff9d;
+        }
+        .warning {
+            background: #3a1a1a;
+            border-left: 4px solid #e94560;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .warning strong {
+            color: #e94560;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 nn.Module 调用方式：为什么 model(x) 比 model.forward(x) 更好？</h1>
+
+        <div class="comparison">
+            <div class="method recommended">
+                <div class="method-title">✅ 推荐：model(x)</div>
+                <pre><code>model = MyNet()
+output = model(x)</code></pre>
+                <p><strong>实际执行流程：</strong></p>
+                <ol>
+                    <li>触发 <code>__call__</code> 魔术方法</li>
+                    <li>PyTorch 自动运行 <strong>hooks</strong>（钩子）</li>
+                    <li>调用 <code>forward(x)</code></li>
+                    <li>再次运行 hooks</li>
+                </ol>
+            </div>
+
+            <div class="method not-recommended">
+                <div class="method-title">❌ 不推荐：model.forward(x)</div>
+                <pre><code>model = MyNet()
+output = model.forward(x)</code></pre>
+                <p><strong>实际执行流程：</strong></p>
+                <ol>
+                    <li>直接调用 <code>forward</code> 方法</li>
+                    <li><strong>跳过所有 hooks</strong></li>
+                    <li>没有任何自动化处理</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="why-it-matters">
+            <h3>🎯 为什么这很重要？</h3>
+            <p>当你使用 <code>model(x)</code> 时，PyTorch 的 <code>__call__</code> 方法会自动执行这些关键操作：</p>
+            <ul class="hooks-list">
+                <li><strong>Pre-hooks:</strong> 前向传播前的预处理（如调试、监控）</li>
+                <li><strong>Forward hook:</strong> 捕获中间层输出（用于可视化、特征提取）</li>
+                <li><strong>Post-hooks:</strong> 后向传播后的处理（如梯度裁剪）</li>
+                <li><strong>Training mode 切换:</strong> 自动处理 dropout/batchnorm 的训练/推理模式</li>
+            </ul>
+        </div>
+
+        <div class="warning">
+            <strong>⚠️ 直接调用 forward() 的后果：</strong>
+            <ul>
+                <li>无法使用 TensorBoard 或其他监控工具</li>
+                <li>dropout 和 batchnorm 可能表现异常</li>
+                <li>无法调试中间层输出</li>
+                <li>分布式训练可能出现问题</li>
+            </ul>
+        </div>
+
+        <div style="margin-top: 30px; padding: 20px; background: #16213e; border-radius: 8px;">
+            <h3 style="color: #4e9af1; margin-top: 0;">🔍 记住：</h3>
+            <p><code>__call__</code> 是你在魔术方法中学过的重要概念！nn.Module 重写了 <code>__call__</code>，它不只是简单地调用 <code>forward()</code>，而是：</p>
+            <pre><code>def __call__(self, *args, **kwargs):
+    # 运行 pre-forward hooks
+    for hook in self._forward_pre_hooks.values():
+        result = hook(*args, **kwargs)
+
+    # 调用 forward
+    result = self.forward(*args, **kwargs)
+
+    # 运行 post-forward hooks
+    for hook in self._forward_hooks.values():
+        hook_result = hook(result)
+
+    return result</code></pre>
+            <p>这就是为什么应该使用 <code>model(x)</code> 而不是 <code>model.forward(x)</code>！</p>
+        </div>
+    </div>
+</body>
+</html>
